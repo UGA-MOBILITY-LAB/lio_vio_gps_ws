@@ -1,0 +1,6 @@
+[submodule "src/FAST_LIO_ROS2"]
+	path = src/FAST_LIO_ROS2
+	url = https://github.com/Ericsii/FAST_LIO_ROS2.git
+[submodule "src/VINS-Fusion-ROS2"]
+	path = src/VINS-Fusion-ROS2
+	url = https://github.com/fanhong-li/VINS-Fusion-ROS2-Humble.git
