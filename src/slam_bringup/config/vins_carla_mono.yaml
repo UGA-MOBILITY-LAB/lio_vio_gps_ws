@@ -1,0 +1,77 @@
+%YAML:1.0
+---
+
+#common parameters
+imu_topic: "/imu/data"
+image_topic: "/camera/image_color"
+output_path: "/tmp/vins_output/"
+
+#camera calibration
+model_type: PINHOLE
+camera_name: carla_cam
+image_width: 1280
+image_height: 720
+
+distortion_parameters:
+    k1: 0.0
+    k2: 0.0
+    p1: 0.0
+    p2: 0.0
+
+projection_parameters:
+    fx: 640.0
+    fy: 640.0
+    cx: 640.0
+    cy: 360.0
+
+# Extrinsic parameter between IMU and Camera
+# T_imu_cam: transformation from camera frame to imu frame
+# imu_link at (0,0,0), camera_link at (0.5, 0, 1.5) relative to base_link
+# Both have identity rotation. So T_imu_cam translates camera→imu = (-0.5, 0, -1.5)
+# But VINS wants body_T_cam0 = T_body_cam = transform from cam to body (imu)
+body_T_cam0: !!opencv-matrix
+    rows: 4
+    cols: 4
+    dt: d
+    data: [1, 0, 0, 0.5,
+           0, 1, 0, 0,
+           0, 0, 1, 1.5,
+           0, 0, 0, 1]
+
+#Multiple thread support
+multiple_thread: 1
+
+#feature traker parameters
+max_cnt: 150
+min_dist: 30
+freq: 10
+F_threshold: 1.0
+show_track: 0
+flow_back: 1
+
+#optimization parameters
+max_solver_time: 0.04
+max_num_iterations: 8
+keyframe_parallax: 10.0
+
+#imu parameters
+# CARLA IMU defaults — conservative noise values for simulation
+acc_n: 0.1          # accelerometer measurement noise density
+gyr_n: 0.01         # gyroscope measurement noise density
+acc_w: 0.001         # accelerometer bias random walk noise density
+gyr_w: 0.0001        # gyroscope bias random walk noise density
+g_norm: 9.81
+
+#loop closure parameters
+loop_closure: 0
+
+#unsynchronization parameters
+estimate_td: 0
+td: 0.0
+
+#visualization parameters
+visualize_imu_forward: 0
+visualize_camera_size: 0.4
+
+#estimation
+estimate_extrinsic: 0

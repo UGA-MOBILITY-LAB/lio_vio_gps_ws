@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+*.so
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ROS2 build artifacts
+install/
+log/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CARLA
+*.pcd
+*.ply
+
+# Claude Code
+.claude/

@@ -1,0 +1,76 @@
+%YAML:1.0
+---
+
+#common parameters
+imu_topic: "/imu/data"
+image_topic: "/camera/image_color"
+output_path: "/tmp/vins_output/"
+
+#camera calibration
+# TODO: Calibrate your real camera and fill in these values
+model_type: PINHOLE
+camera_name: real_cam
+image_width: 1280
+image_height: 720
+
+distortion_parameters:
+    k1: 0.0       # TODO: from camera calibration
+    k2: 0.0       # TODO: from camera calibration
+    p1: 0.0       # TODO: from camera calibration
+    p2: 0.0       # TODO: from camera calibration
+
+projection_parameters:
+    fx: 640.0      # TODO: from camera calibration
+    fy: 640.0      # TODO: from camera calibration
+    cx: 640.0      # TODO: from camera calibration
+    cy: 360.0      # TODO: from camera calibration
+
+# Extrinsic parameter between IMU and Camera
+# T_body_cam0: transformation from camera frame to body (IMU) frame
+# TODO: Measure or calibrate the extrinsic between your IMU and camera
+body_T_cam0: !!opencv-matrix
+    rows: 4
+    cols: 4
+    dt: d
+    data: [1, 0, 0, 0.0,
+           0, 1, 0, 0.0,
+           0, 0, 1, 0.0,
+           0, 0, 0, 1]
+
+#Multiple thread support
+multiple_thread: 1
+
+#feature traker parameters
+max_cnt: 150
+min_dist: 30
+freq: 10
+F_threshold: 1.0
+show_track: 0
+flow_back: 1
+
+#optimization parameters
+max_solver_time: 0.04
+max_num_iterations: 8
+keyframe_parallax: 10.0
+
+#imu parameters
+# TODO: Fill in from your IMU datasheet
+acc_n: 0.1          # accelerometer measurement noise density
+gyr_n: 0.01         # gyroscope measurement noise density
+acc_w: 0.001         # accelerometer bias random walk noise density
+gyr_w: 0.0001        # gyroscope bias random walk noise density
+g_norm: 9.81
+
+#loop closure parameters
+loop_closure: 0
+
+#unsynchronization parameters
+estimate_td: 1       # estimate time offset between IMU and camera
+td: 0.0
+
+#visualization parameters
+visualize_imu_forward: 0
+visualize_camera_size: 0.4
+
+#estimation
+estimate_extrinsic: 1  # calibrate extrinsic online (1=optimize, 2=rough initial)
