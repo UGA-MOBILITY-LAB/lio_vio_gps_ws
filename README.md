@@ -33,7 +33,7 @@ Supports both **CARLA 0.9.15 simulation** (with a built-in real-time sensor brid
 | robot_localization — local EKF | ✅ working | `ekf_filter_node_odom` publishes `odom → base_link` from LIO (+ VIO) |
 | robot_localization — global EKF | ✅ working | `ekf_filter_node_map` fuses LIO + GPS, publishes `map → odom`, corrects LIO drift |
 | GPS / GNSS | ✅ fused | `navsat_transform_node` turns `/gps/fix` into `/odometry/gps`, consumed by the global EKF |
-| VINS-Fusion (camera + IMU) | 🚧 WIP | config now parses; segfaults on first frame (image encoding / distortion path), off by default |
+| VINS-Fusion (camera + IMU) | ✅ working | enable with `vins:=true`; initialises cleanly on the 3-second brake-hold warmup and tracks in real-world scale |
 | Unified RViz layout | ✅ working | `slam_carla.rviz` auto-launched; toggle with `rviz:=false` |
 
 ---
