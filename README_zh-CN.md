@@ -12,9 +12,15 @@
 
 同时支持 **CARLA 0.9.15 仿真**（内置实时传感器桥接和时钟服务器）和 **实车部署**（接入传感器驱动即可运行）。
 
-### 实机演示 — CARLA 自动驾驶 + 实时 LIO 建图
+### 实机演示 — CARLA 自动驾驶 + 实时 SLAM
 
-![CARLA SLAM 演示](demos/carla_slam_demo.gif)
+**纯 LIO — FAST-LIO2 单独建图（GPS 融合接入前的状态）：**
+
+![CARLA FAST-LIO 演示](demos/carla_slam_demo.gif)
+
+**LIO + GPS（双 EKF）— GPS 把 odom 帧拉回全局 datum：**
+
+![CARLA LIO+GPS 演示](demos/carla_slam_demo_gps.gif)
 
 *Tesla Model 3 在 CARLA Town10HD 里开启 autopilot 连续行驶（忽略红灯/停止标志以保证录像不中断）。右侧为统一 RViz 视图 `slam_carla.rviz`：彩虹色是 FAST-LIO2 累积建图，中心亮红色圆环是当前配准扫描，左上插图为车载前视相机实时画面。整条管线和 RViz 用一条命令启动（`ros2 launch slam_bringup carla_full.launch.py`）。*
 

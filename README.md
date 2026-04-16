@@ -12,9 +12,15 @@ A **ROS2 Humble** multi-source SLAM fusion workspace that tightly integrates thr
 
 Supports both **CARLA 0.9.15 simulation** (with a built-in real-time sensor bridge and clock server) and **real vehicle deployment** (plug in your sensor drivers and go).
 
-### Live demo — CARLA autopilot + real-time LIO mapping
+### Live demo — CARLA autopilot + real-time SLAM
 
-![CARLA SLAM Demo](demos/carla_slam_demo.gif)
+**LIO only — pure FAST-LIO2 mapping (before GPS fusion was wired in):**
+
+![CARLA FAST-LIO Demo](demos/carla_slam_demo.gif)
+
+**LIO + GPS (dual-EKF) — GPS pulls the odom frame back to the global datum:**
+
+![CARLA LIO+GPS Demo](demos/carla_slam_demo_gps.gif)
 
 *Tesla Model 3 under CARLA autopilot (traffic lights ignored so the recording stays in motion). The right pane is the unified `slam_carla.rviz` — rainbow accumulated map from FAST-LIO2, the bright red ring is the current registered scan, the top-left inset is the live front camera. Pipeline and RViz are launched with one command (`ros2 launch slam_bringup carla_full.launch.py`).*
 
