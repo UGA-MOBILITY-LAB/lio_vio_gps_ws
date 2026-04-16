@@ -24,8 +24,9 @@
 |------|------|------|
 | CARLA 桥接 (`carla_bridge`) | ✅ 可用 | autopilot + 观察相机跟随 + 忽略红灯/停车标志 |
 | FAST-LIO2（LiDAR + IMU） | ✅ 可用 | 10 Hz，每帧 ~65k 点，为 CARLA 调优了雷达密度 |
-| robot_localization EKF | ✅ 可用 | 融合 FAST-LIO2（当前未接 VINS） |
-| GPS / GNSS | ⚠️ 部分 | `/gps/fix` 已发布，`navsat_transform` 已运行，但**尚未回馈到 EKF 做位姿融合** |
+| robot_localization 局部 EKF | ✅ 可用 | `ekf_filter_node_odom` 用 LIO（+ VIO）发 `odom → base_link` |
+| robot_localization 全局 EKF | ✅ 可用 | `ekf_filter_node_map` 融合 LIO + GPS，发 `map → odom`，修正 LIO 累积漂移 |
+| GPS / GNSS | ✅ 已融合 | `navsat_transform_node` 把 `/gps/fix` 转成 `/odometry/gps` 喂给全局 EKF |
 | VINS-Fusion（相机 + IMU） | 🚧 开发中 | 配置解析通过，但第一帧就 segfault（图像编码 / 去畸变路径），默认关闭 |
 | 统一 RViz 布局 | ✅ 可用 | `slam_carla.rviz` 随 launch 自动打开；可用 `rviz:=false` 关闭 |
 

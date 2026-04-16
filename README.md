@@ -24,8 +24,9 @@ Supports both **CARLA 0.9.15 simulation** (with a built-in real-time sensor brid
 |-----------|-------|-------|
 | CARLA bridge (`carla_bridge`) | ✅ working | autopilot + spectator chase + ignore lights/signs |
 | FAST-LIO2 (LiDAR + IMU) | ✅ working | 10 Hz, ~65k pts/scan, CARLA-tuned LiDAR density |
-| robot_localization EKF | ✅ working | fusing FAST-LIO2 (VINS currently off) |
-| GPS / GNSS | ⚠️ partial | `/gps/fix` published and `navsat_transform` runs, but **not yet fused back into the EKF** |
+| robot_localization — local EKF | ✅ working | `ekf_filter_node_odom` publishes `odom → base_link` from LIO (+ VIO) |
+| robot_localization — global EKF | ✅ working | `ekf_filter_node_map` fuses LIO + GPS, publishes `map → odom`, corrects LIO drift |
+| GPS / GNSS | ✅ fused | `navsat_transform_node` turns `/gps/fix` into `/odometry/gps`, consumed by the global EKF |
 | VINS-Fusion (camera + IMU) | 🚧 WIP | config now parses; segfaults on first frame (image encoding / distortion path), off by default |
 | Unified RViz layout | ✅ working | `slam_carla.rviz` auto-launched; toggle with `rviz:=false` |
 
