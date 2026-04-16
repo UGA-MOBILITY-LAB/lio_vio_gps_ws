@@ -33,7 +33,7 @@
 | robot_localization 局部 EKF | ✅ 可用 | `ekf_filter_node_odom` 用 LIO（+ VIO）发 `odom → base_link` |
 | robot_localization 全局 EKF | ✅ 可用 | `ekf_filter_node_map` 融合 LIO + GPS，发 `map → odom`，修正 LIO 累积漂移 |
 | GPS / GNSS | ✅ 已融合 | `navsat_transform_node` 把 `/gps/fix` 转成 `/odometry/gps` 喂给全局 EKF |
-| VINS-Fusion（相机 + IMU） | 🚧 开发中 | 配置解析通过，但第一帧就 segfault（图像编码 / 去畸变路径），默认关闭 |
+| VINS-Fusion（相机 + IMU） | ✅ 可用 | `vins:=true` 开启；靠 3 秒手刹热身窗口完成初始化，尺度正确 |
 | 统一 RViz 布局 | ✅ 可用 | `slam_carla.rviz` 随 launch 自动打开；可用 `rviz:=false` 关闭 |
 
 ---
