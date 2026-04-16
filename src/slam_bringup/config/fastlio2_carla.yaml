@@ -2,11 +2,11 @@
     ros__parameters:
         use_sim_time: true
         feature_extract_enable: false
-        point_filter_num: 4
+        point_filter_num: 1
         max_iteration: 4
         filter_size_surf: 0.5
         filter_size_map: 0.5
-        cube_side_length: 1000.0
+        cube_side_length: 200.0
         runtime_pos_log_enable: false
 
         common:
@@ -39,7 +39,7 @@
             scan_publish_en: true
             dense_publish_en: true
             scan_bodyframe_pub_en: true
-            map_en: false
+            map_en: true
 
         pcd_save:
             pcd_save_en: false

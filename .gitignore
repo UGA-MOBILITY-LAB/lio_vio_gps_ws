@@ -33,3 +33,6 @@ Thumbs.db
 *.pcd
 *.ply
 
+# Demo videos — keep GIFs in git for README embed, but not the larger mp4 source
+demos/*.mp4
+
