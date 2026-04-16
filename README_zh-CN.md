@@ -316,7 +316,10 @@ ros2 launch slam_bringup carla_full.launch.py
 # 可选参数：
 #   rviz:=false   # 不启动 RViz 窗口（无头模式）
 #   vins:=true    # 启用 VINS-Fusion（开发中，默认关闭）
+#   two_d:=false  # 3D 模式（默认 true 锁定 z/roll/pitch，适合平坦 CARLA 地图）
 ```
+
+> **启动预期** —— 启动后给 pipeline **5–10 秒**稳定时间。全局 EKF 的位姿会明显摆动，原因：(a) FAST-LIO2 要完成 IMU 重力对齐并建出第一张局部地图，(b) `navsat_transform_node` 的 5 秒 delay 结束后 GPS 融合才接入。之后 RViz 里位姿就锁在 map 里、累积点云不再滑动。
 
 一条命令同时启动：
 1. **carla_live_publisher** — 连接 CARLA，生成车辆 + 传感器，发布所有话题 + `/clock`；观察相机自动跟随 ego vehicle，在 CARLA 窗口里始终能看到车
@@ -646,6 +649,46 @@ CARLA 桥接节点是整个 ROS2 图的**时钟服务器**：
 2. 销毁自驾车辆 actor
 3. 恢复 CARLA 世界为异步模式
 4. 禁用 traffic manager 同步模式
+
+---
+
+## 实车部署要点
+
+### GPS 质量 —— GPS 不准或失锁时怎么办
+
+CARLA 演示用的是零噪声仿真 GNSS，实车很少有这种待遇。管线的应对：
+
+| 场景 | 行为 |
+|------|------|
+| **RTK-GPS（1–2 cm）** | 理想情况 —— EKF 紧耦合 GPS 和 LIO，`/odometry/global` 接近 GPS 精度，LIO 负责 GPS 短时丢失 |
+| **消费级 GPS（3–5 m）** | 仍可用 —— `navsat_transform_node` 把 GPS 协方差原样转入 `/odometry/gps`，EKF 自动按协方差加权：短时间信任 LIO，长期靠 GPS 修漂 |
+| **城市峡谷 / 多路径** | 协方差飙升 → EKF 自然信 LIO 多。建议加一个轻量前置过滤节点，`/gps/fix` 里 `status == NO_FIX` 或 HDOP 差的点直接丢弃，不让它们进 `navsat_transform` |
+| **GPS-denied（隧道、室内、地库）** | EKF 回退纯 LIO + IMU 惯性航位推算。长时间没 GPS 时建议加**回环检测**（FAST-LIO-SAM 或 scan-context + pose-graph 后端），纯 FAST-LIO2 开环会漂 |
+
+**调参点：**
+- `ekf_navsat.yaml` 里的 `odom1_config` / `odom0_config` —— 控制哪些 GPS 维度参与融合（高程不可信就禁 `z`，默认已禁）
+- EKF 的 `process_noise_covariance` —— 值越小越信运动模型（LIO），对 GPS 抖动越迟钝
+- `navsat_transform_node.delay` —— 现默认 5 秒，GPS 模块慢的话可以再加
+
+### 平地 vs 三维地形
+
+`two_d_mode: true`（CARLA launch 默认 `two_d:=true`）把 z / roll / pitch 锁为 0。对 Town10HD 这类平坦城市地图合适。实车带高程变化时用 `two_d:=false`：
+
+```bash
+ros2 launch slam_bringup carla_full.launch.py two_d:=false
+```
+
+开 3D 模式时要保证 LIO 的 z 输出可靠（CARLA 仿真 GPS 高程**不可信**）。上 RTK + 好 DOP 是最直接的办法，或者在 EKF 里额外加气压计 / 轮速推出的俯仰。
+
+### 启动稳定性
+
+启动后**5–10 秒**内噪声大 —— 每个 EKF + SLAM 系统都这样：
+
+1. FAST-LIO2 需要几秒估 IMU bias + 完成首帧配准；
+2. `navsat_transform_node` 的 `delay: 5.0` 到期后才发 `/odometry/gps`，保证 GPS 进入滤波器前 LIO 已收敛；
+3. EKF 初始协方差大，前几个测量会把状态推得动。
+
+前约 10 秒不要用融合位姿。`ekf_navsat.yaml` 里的 `delay` 还能往上调。生产部署建议单独做个 "SLAM ready" 信号，让下游 planner 拿之前先检查。
 
 ---
 

@@ -33,6 +33,7 @@ def generate_launch_description():
     town = LaunchConfiguration('town')
     rviz = LaunchConfiguration('rviz')
     vins = LaunchConfiguration('vins')
+    two_d = LaunchConfiguration('two_d')
 
     return LaunchDescription([
         # ── Launch arguments ──────────────────────────────────────
@@ -48,6 +49,12 @@ def generate_launch_description():
             'vins',
             default_value='false',
             description='Launch VINS-Fusion (requires a VINS-format config; off until vins_carla_mono.yaml is converted)',
+        ),
+        DeclareLaunchArgument(
+            'two_d',
+            default_value='true',
+            description='Lock EKF z/roll/pitch to zero. Default true for flat '
+                        'CARLA maps; set false for 3D scenarios or real vehicles.',
         ),
 
         # ── 1. CARLA bridge (clock server — NOT use_sim_time) ─────
@@ -91,6 +98,7 @@ def generate_launch_description():
                 os.path.join(launch_dir, 'ekf_fusion.launch.py')),
             launch_arguments={
                 'use_sim_time': 'true',
+                'two_d': two_d,
             }.items(),
         ),
 
