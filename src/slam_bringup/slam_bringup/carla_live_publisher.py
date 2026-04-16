@@ -192,6 +192,7 @@ class CarlaLVISamBridge(Node):
         self._vehicle = None
         self._sensors = []
         self._spectator = None
+        self._warmup_ticks_remaining = 0
         self._original_settings = None
         self._running = True
 
@@ -311,18 +312,23 @@ class CarlaLVISamBridge(Node):
             raise RuntimeError('No spawn points on this map')
 
         self._vehicle = self._world.spawn_actor(vehicle_bp, spawns[0])
-        self._vehicle.set_autopilot(True, self._tm.get_port())
 
-        # Keep the car moving continuously for SLAM demos (no red-light
-        # waits). Stick to the speed limit so inter-scan motion stays
-        # manageable for 10 Hz FAST-LIO (high speed = ICP struggles).
+        # Hold the car stationary with brakes applied for a few seconds so
+        # both FAST-LIO (IMU gravity alignment) and VINS-Fusion (initial
+        # structure-IMU alignment) have a clean, motion-free window to
+        # initialise on.  Ticks rather than seconds so it scales with
+        # fixed_delta_seconds (200 Hz → 600 ticks = 3 s).
+        self._warmup_ticks_remaining = 600
+        self._vehicle.apply_control(
+            carla.VehicleControl(throttle=0.0, brake=1.0, hand_brake=True))
+
         self._tm.ignore_lights_percentage(self._vehicle, 100.0)
         self._tm.ignore_signs_percentage(self._vehicle, 100.0)
         self._tm.vehicle_percentage_speed_difference(self._vehicle, 0.0)
 
         self.get_logger().info(
             f'Spawned {bp_filter} at {spawns[0].location}  '
-            f'(autopilot ON, ignoring lights/signs, speed-limit)')
+            f'(brake-hold {self._warmup_ticks_remaining} ticks, then autopilot)')
 
         self._spectator = self._world.get_spectator()
         self._update_spectator()
@@ -627,6 +633,19 @@ class CarlaLVISamBridge(Node):
 
                 # 3b — chase the ego vehicle with the spectator camera
                 self._update_spectator()
+
+                # 3c — release the brake once the SLAM warmup window expires,
+                # then let the traffic-manager autopilot take over.
+                if self._warmup_ticks_remaining > 0:
+                    self._warmup_ticks_remaining -= 1
+                    if self._warmup_ticks_remaining == 0:
+                        self._vehicle.apply_control(
+                            carla.VehicleControl(
+                                throttle=0.0, brake=0.0, hand_brake=False))
+                        self._vehicle.set_autopilot(
+                            True, self._tm.get_port())
+                        self.get_logger().info(
+                            'Warmup complete — autopilot engaged')
 
                 # 4 — service any pending ROS2 callbacks (param changes, etc.)
                 rclpy.spin_once(self, timeout_sec=0)
