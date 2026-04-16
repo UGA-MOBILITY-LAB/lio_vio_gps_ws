@@ -1,77 +1,70 @@
 %YAML:1.0
----
 
-#common parameters
+# VINS-Fusion config for CARLA mono-camera + IMU.
+# See realsense_d435i/realsense_stereo_imu_config.yaml for full reference.
+
+#common parameters — 1 IMU + 1 camera
+imu: 1
+num_of_cam: 1
+
 imu_topic: "/imu/data"
-image_topic: "/camera/image_color"
+image0_topic: "/camera/image_color"
 output_path: "/tmp/vins_output/"
 
-#camera calibration
-model_type: PINHOLE
-camera_name: carla_cam
+cam0_calib: "cam0_carla.yaml"
 image_width: 1280
 image_height: 720
 
-distortion_parameters:
-    k1: 0.0
-    k2: 0.0
-    p1: 0.0
-    p2: 0.0
+# GPU acceleration (CPU only for now)
+use_gpu:           0
+use_gpu_acc_flow:  0
+use_gpu_ceres:     0
 
-projection_parameters:
-    fx: 640.0
-    fy: 640.0
-    cx: 640.0
-    cy: 360.0
+# Extrinsic parameter between IMU and Camera.
+# 0 = trust the matrix below exactly, 1 = optimize around initial guess.
+# The bridge mounts camera at (+0.5, 0, +1.5) m in base_link with identity
+# rotation.  IMU is at (0, 0, 0) in base_link.  So camera w.r.t. IMU (body)
+# is a pure translation (+0.5, 0, +1.5) with identity rotation.
+estimate_extrinsic: 0
 
-# Extrinsic parameter between IMU and Camera
-# T_imu_cam: transformation from camera frame to imu frame
-# imu_link at (0,0,0), camera_link at (0.5, 0, 1.5) relative to base_link
-# Both have identity rotation. So T_imu_cam translates camera→imu = (-0.5, 0, -1.5)
-# But VINS wants body_T_cam0 = T_body_cam = transform from cam to body (imu)
 body_T_cam0: !!opencv-matrix
-    rows: 4
-    cols: 4
-    dt: d
-    data: [1, 0, 0, 0.5,
-           0, 1, 0, 0,
-           0, 0, 1, 1.5,
-           0, 0, 0, 1]
+   rows: 4
+   cols: 4
+   dt: d
+   data: [1.0, 0.0, 0.0, 0.5,
+          0.0, 1.0, 0.0, 0.0,
+          0.0, 0.0, 1.0, 1.5,
+          0.0, 0.0, 0.0, 1.0]
 
-#Multiple thread support
+# Multiple thread support
 multiple_thread: 1
 
-#feature traker parameters
-max_cnt: 150
-min_dist: 30
-freq: 10
-F_threshold: 1.0
-show_track: 0
-flow_back: 1
+# Feature tracker parameters
+max_cnt:       150
+min_dist:      30
+freq:          10
+F_threshold:   1.0
+show_track:    0
+flow_back:     1
 
-#optimization parameters
-max_solver_time: 0.04
+# Optimization parameters
+max_solver_time:    0.04
 max_num_iterations: 8
-keyframe_parallax: 10.0
+keyframe_parallax:  10.0
 
-#imu parameters
-# CARLA IMU defaults — conservative noise values for simulation
-acc_n: 0.1          # accelerometer measurement noise density
-gyr_n: 0.01         # gyroscope measurement noise density
-acc_w: 0.001         # accelerometer bias random walk noise density
-gyr_w: 0.0001        # gyroscope bias random walk noise density
+# IMU parameters — CARLA default IMU has zero noise, but VINS needs
+# non-zero values to avoid singular matrices. Conservative defaults.
+acc_n:  0.1
+gyr_n:  0.01
+acc_w:  0.001
+gyr_w:  0.0001
 g_norm: 9.81
 
-#loop closure parameters
-loop_closure: 0
-
-#unsynchronization parameters
+# Unsynchronization between camera and IMU
 estimate_td: 0
-td: 0.0
+td:          0.0
 
-#visualization parameters
-visualize_imu_forward: 0
-visualize_camera_size: 0.4
-
-#estimation
-estimate_extrinsic: 0
+# Loop closure (disabled for this demo)
+load_previous_pose_graph: 0
+pose_graph_save_path:    "/tmp/vins_output/pose_graph/"
+save_image:               0

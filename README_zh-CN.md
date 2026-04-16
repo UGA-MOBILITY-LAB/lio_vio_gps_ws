@@ -12,6 +12,23 @@
 
 同时支持 **CARLA 0.9.15 仿真**（内置实时传感器桥接和时钟服务器）和 **实车部署**（接入传感器驱动即可运行）。
 
+### 实机演示 — CARLA 自动驾驶 + 实时 LIO 建图
+
+![CARLA SLAM 演示](demos/carla_slam_demo.gif)
+
+*Tesla Model 3 在 CARLA Town10HD 里开启 autopilot 连续行驶（忽略红灯/停止标志以保证录像不中断）。右侧为统一 RViz 视图 `slam_carla.rviz`：彩虹色是 FAST-LIO2 累积建图，中心亮红色圆环是当前配准扫描，左上插图为车载前视相机实时画面。整条管线和 RViz 用一条命令启动（`ros2 launch slam_bringup carla_full.launch.py`）。*
+
+### 当前进度
+
+| 组件 | 状态 | 备注 |
+|------|------|------|
+| CARLA 桥接 (`carla_bridge`) | ✅ 可用 | autopilot + 观察相机跟随 + 忽略红灯/停车标志 |
+| FAST-LIO2（LiDAR + IMU） | ✅ 可用 | 10 Hz，每帧 ~65k 点，为 CARLA 调优了雷达密度 |
+| robot_localization EKF | ✅ 可用 | 融合 FAST-LIO2（当前未接 VINS） |
+| GPS / GNSS | ⚠️ 部分 | `/gps/fix` 已发布，`navsat_transform` 已运行，但**尚未回馈到 EKF 做位姿融合** |
+| VINS-Fusion（相机 + IMU） | 🚧 开发中 | 配置解析通过，但第一帧就 segfault（图像编码 / 去畸变路径），默认关闭 |
+| 统一 RViz 布局 | ✅ 可用 | `slam_carla.rviz` 随 launch 自动打开；可用 `rviz:=false` 关闭 |
+
 ---
 
 ## 目录
@@ -283,20 +300,24 @@ cd ~/carla_sim
 # 等待 CARLA 窗口完全加载
 ```
 
-### 终端 2：启动完整管线
+### 终端 2：一条命令启动完整管线
 
 ```bash
 conda activate carla_env
 source ~/lio_vio_gps_ws/install/setup.bash
 ros2 launch slam_bringup carla_full.launch.py
+# 可选参数：
+#   rviz:=false   # 不启动 RViz 窗口（无头模式）
+#   vins:=true    # 启用 VINS-Fusion（开发中，默认关闭）
 ```
 
 一条命令同时启动：
-1. **carla_live_publisher** — 连接 CARLA，生成车辆 + 传感器，发布所有话题 + `/clock`
-2. **FAST-LIO2** — 订阅 `/lidar/points` + `/imu/data`，发布 `/Odometry`
-3. **VINS-Fusion** — 订阅 `/camera/image_color` + `/imu/data`，发布 `/vins_estimator/odometry`
-4. **robot_localization EKF** — 融合 `/Odometry` + `/vins_estimator/odometry`，发布 `/odometry/filtered`
-5. **navsat_transform** — 将 `/gps/fix` 转换到里程计坐标系
+1. **carla_live_publisher** — 连接 CARLA，生成车辆 + 传感器，发布所有话题 + `/clock`；观察相机自动跟随 ego vehicle，在 CARLA 窗口里始终能看到车
+2. **FAST-LIO2** — 订阅 `/lidar/points` + `/imu/data`，发布 `/Odometry` 以及累积建图 `/Laser_map`
+3. **VINS-Fusion** — 可选（`vins:=true`），订阅 `/camera/image_color` + `/imu/data`，发布 `/vins_estimator/odometry`
+4. **robot_localization EKF** — 融合 `/Odometry`（VINS 开启时也含 `/vins_estimator/odometry`），发布 `/odometry/filtered`
+5. **navsat_transform** — 将 `/gps/fix` 转换到 map 坐标系
+6. **RViz2** — 使用 `slam_carla.rviz` 打开相机画面、FAST-LIO 建图、里程计轨迹和 TF（`rviz:=false` 可关）
 
 ### 终端 3：验证
 

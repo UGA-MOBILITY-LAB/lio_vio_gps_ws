@@ -12,6 +12,23 @@ A **ROS2 Humble** multi-source SLAM fusion workspace that tightly integrates thr
 
 Supports both **CARLA 0.9.15 simulation** (with a built-in real-time sensor bridge and clock server) and **real vehicle deployment** (plug in your sensor drivers and go).
 
+### Live demo — CARLA autopilot + real-time LIO mapping
+
+![CARLA SLAM Demo](demos/carla_slam_demo.gif)
+
+*Tesla Model 3 under CARLA autopilot (traffic lights ignored so the recording stays in motion). The right pane is the unified `slam_carla.rviz` — rainbow accumulated map from FAST-LIO2, the bright red ring is the current registered scan, the top-left inset is the live front camera. Pipeline and RViz are launched with one command (`ros2 launch slam_bringup carla_full.launch.py`).*
+
+### Status at a glance
+
+| Component | State | Notes |
+|-----------|-------|-------|
+| CARLA bridge (`carla_bridge`) | ✅ working | autopilot + spectator chase + ignore lights/signs |
+| FAST-LIO2 (LiDAR + IMU) | ✅ working | 10 Hz, ~65k pts/scan, CARLA-tuned LiDAR density |
+| robot_localization EKF | ✅ working | fusing FAST-LIO2 (VINS currently off) |
+| GPS / GNSS | ⚠️ partial | `/gps/fix` published and `navsat_transform` runs, but **not yet fused back into the EKF** |
+| VINS-Fusion (camera + IMU) | 🚧 WIP | config now parses; segfaults on first frame (image encoding / distortion path), off by default |
+| Unified RViz layout | ✅ working | `slam_carla.rviz` auto-launched; toggle with `rviz:=false` |
+
 ---
 
 ## Table of Contents
@@ -283,20 +300,24 @@ cd ~/carla_sim
 # Wait for the CARLA window to fully load
 ```
 
-### Terminal 2: Launch the Full Pipeline
+### Terminal 2: Launch the Full Pipeline (one command)
 
 ```bash
 conda activate carla_env
 source ~/lio_vio_gps_ws/install/setup.bash
 ros2 launch slam_bringup carla_full.launch.py
+# optional flags:
+#   rviz:=false   # headless, no RViz window
+#   vins:=true    # enable VINS-Fusion (currently WIP, off by default)
 ```
 
 This single command launches:
-1. **carla_live_publisher** — connects to CARLA, spawns vehicle + sensors, publishes all topics + `/clock`
-2. **FAST-LIO2** — subscribes to `/lidar/points` + `/imu/data`, publishes `/Odometry`
-3. **VINS-Fusion** — subscribes to `/camera/image_color` + `/imu/data`, publishes `/vins_estimator/odometry`
-4. **robot_localization EKF** — fuses `/Odometry` + `/vins_estimator/odometry`, publishes `/odometry/filtered`
-5. **navsat_transform** — converts `/gps/fix` to odometry frame
+1. **carla_live_publisher** — connects to CARLA, spawns vehicle + sensors, publishes all topics + `/clock`; spectator camera chases the ego vehicle so the CARLA window always shows it
+2. **FAST-LIO2** — subscribes to `/lidar/points` + `/imu/data`, publishes `/Odometry` and the accumulated map on `/Laser_map`
+3. **VINS-Fusion** — optional (`vins:=true`), subscribes to `/camera/image_color` + `/imu/data`, publishes `/vins_estimator/odometry`
+4. **robot_localization EKF** — fuses `/Odometry` (+ `/vins_estimator/odometry` when VINS is on), publishes `/odometry/filtered`
+5. **navsat_transform** — converts `/gps/fix` to the map frame
+6. **RViz2** — opens with `slam_carla.rviz` showing camera feed, FAST-LIO map, odometry paths, and TF (toggle with `rviz:=false`)
 
 ### Terminal 3: Verify Everything
 

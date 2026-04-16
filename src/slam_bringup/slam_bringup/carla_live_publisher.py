@@ -21,10 +21,23 @@ Usage:
         -p town:=Town10HD -p vehicle_filter:=vehicle.tesla.model3
 """
 
+import os
+import sys
+
+# Re-exec under carla_env python if the current interpreter lacks the `carla`
+# module. Colcon installs console_scripts with the shebang of whichever python
+# ran setup.py (often /usr/bin/python3), which does not have `carla`. This
+# guard makes the node robust regardless of how it was launched.
+_CARLA_ENV_PY = '/home/haohua/miniconda3/envs/carla_env/bin/python'
+if os.path.exists(_CARLA_ENV_PY) and sys.executable != _CARLA_ENV_PY:
+    try:
+        import carla  # noqa: F401
+    except ModuleNotFoundError:
+        os.execv(_CARLA_ENV_PY, [_CARLA_ENV_PY] + sys.argv)
+
 import copy
 import math
 import signal
-import sys
 import queue
 
 import numpy as np
@@ -125,8 +138,15 @@ class CarlaLVISamBridge(Node):
             'transform': carla.Transform(carla.Location(x=0.0, y=0.0, z=1.8)),
             'attrs': {
                 'channels':           '64',
-                'points_per_second':  '1300000',
-                'rotation_frequency': '10',             # 10 Hz full scan
+                # 1.3M/s at 200 Hz rotation gives only ~6.5k pts per full
+                # scan. Boost to ~130k pts (VLP-64-like density).
+                'points_per_second':  '26000000',
+                # CARLA sync-mode quirk: each physics tick emits
+                # (rotation_frequency * fixed_delta_seconds) fraction of a
+                # rotation. To get a full 360° scan per delivery, spin the
+                # LiDAR at physics rate (1/dt = 200 Hz). sensor_tick still
+                # throttles the callback rate to 10 Hz.
+                'rotation_frequency': '200',
                 'range':              '100',
                 'upper_fov':          '15',
                 'lower_fov':          '-25',
@@ -171,6 +191,7 @@ class CarlaLVISamBridge(Node):
         self._cv_bridge = CvBridge()
         self._vehicle = None
         self._sensors = []
+        self._spectator = None
         self._original_settings = None
         self._running = True
 
@@ -291,8 +312,37 @@ class CarlaLVISamBridge(Node):
 
         self._vehicle = self._world.spawn_actor(vehicle_bp, spawns[0])
         self._vehicle.set_autopilot(True, self._tm.get_port())
+
+        # Keep the car moving for a continuous SLAM demo:
+        #   - ignore red lights / stop signs
+        #   - drive slightly above the speed limit (auto = +30%)
+        self._tm.ignore_lights_percentage(self._vehicle, 100.0)
+        self._tm.ignore_signs_percentage(self._vehicle, 100.0)
+        self._tm.vehicle_percentage_speed_difference(self._vehicle, -30.0)
+
         self.get_logger().info(
-            f'Spawned {bp_filter} at {spawns[0].location}  (autopilot ON)')
+            f'Spawned {bp_filter} at {spawns[0].location}  '
+            f'(autopilot ON, ignoring lights/signs, +30% speed)')
+
+        self._spectator = self._world.get_spectator()
+        self._update_spectator()
+        self.get_logger().info('Spectator will chase the ego vehicle (~8 m back, 3 m up)')
+
+    def _update_spectator(self):
+        """Move the CARLA spectator camera to a chase view behind the ego vehicle."""
+        if self._spectator is None or self._vehicle is None:
+            return
+        vt = self._vehicle.get_transform()
+        yaw_rad = math.radians(vt.rotation.yaw)
+        back = 8.0
+        up = 3.0
+        cam_loc = carla.Location(
+            x=vt.location.x - back * math.cos(yaw_rad),
+            y=vt.location.y - back * math.sin(yaw_rad),
+            z=vt.location.z + up,
+        )
+        cam_rot = carla.Rotation(pitch=-15.0, yaw=vt.rotation.yaw, roll=0.0)
+        self._spectator.set_transform(carla.Transform(cam_loc, cam_rot))
 
     def _attach_sensors(self):
         bp_lib = self._world.get_blueprint_library()
@@ -389,6 +439,17 @@ class CarlaLVISamBridge(Node):
         msg.linear_acceleration.y = -data.accelerometer.y
         msg.linear_acceleration.z =  data.accelerometer.z
 
+        # Diagnostic: log every ~1 s worth of IMU (at 200 Hz → every 200 frames)
+        self._imu_log_ctr = getattr(self, '_imu_log_ctr', 0) + 1
+        if self._imu_log_ctr % 200 == 0:
+            self.get_logger().info(
+                f'[IMU] accel=({msg.linear_acceleration.x:+.3f}, '
+                f'{msg.linear_acceleration.y:+.3f}, '
+                f'{msg.linear_acceleration.z:+.3f}) m/s²  '
+                f'gyro=({msg.angular_velocity.x:+.4f}, '
+                f'{msg.angular_velocity.y:+.4f}, '
+                f'{msg.angular_velocity.z:+.4f}) rad/s')
+
         return msg
 
     def _build_pointcloud_msg(self, data, ts):
@@ -437,6 +498,19 @@ class CarlaLVISamBridge(Node):
         msg.row_step    = self.PC2_POINT_STEP * n
         msg.is_dense    = True
         msg.data        = cloud.tobytes()
+
+        # Diagnostic: log cloud stats every 50 scans (~5 s at 10 Hz)
+        self._pc_log_ctr = getattr(self, '_pc_log_ctr', 0) + 1
+        if self._pc_log_ctr % 50 == 1:
+            x = cloud['x']; y = cloud['y']; z = cloud['z']
+            finite = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
+            self.get_logger().info(
+                f'[LiDAR] n={n} finite={finite.sum()} '
+                f'x[{x.min():+.1f},{x.max():+.1f}] '
+                f'y[{y.min():+.1f},{y.max():+.1f}] '
+                f'z[{z.min():+.1f},{z.max():+.1f}] '
+                f'ring[{cloud["ring"].min()},{cloud["ring"].max()}] '
+                f't[{cloud["time"].min():.4f},{cloud["time"].max():.4f}]')
         return msg
 
     def _empty_pc2(self, header):
@@ -538,7 +612,7 @@ class CarlaLVISamBridge(Node):
         while self._running and rclpy.ok():
             try:
                 # 1 — advance the simulation
-                self._world.tick(timeout=10.0)
+                self._world.tick(10.0)
                 snap = self._world.get_snapshot()
                 sim_time = snap.timestamp.elapsed_seconds
                 frame    = snap.frame
@@ -550,6 +624,9 @@ class CarlaLVISamBridge(Node):
 
                 # 3 — publish sensor data for this frame
                 self._drain_and_publish(frame, sim_time)
+
+                # 3b — chase the ego vehicle with the spectator camera
+                self._update_spectator()
 
                 # 4 — service any pending ROS2 callbacks (param changes, etc.)
                 rclpy.spin_once(self, timeout_sec=0)
