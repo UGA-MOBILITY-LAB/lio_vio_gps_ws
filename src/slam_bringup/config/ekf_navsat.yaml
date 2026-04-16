@@ -12,7 +12,11 @@ ekf_filter_node_odom:
     ros__parameters:
         use_sim_time: true
         frequency: 50.0
-        two_d_mode: false
+        # Town10HD (and most urban CARLA maps) is effectively flat.  Locking
+        # z / roll / pitch to zero prevents the global EKF from drifting
+        # vertically once IMU / LIO noise accumulates — the car stays on
+        # the ground plane instead of sliding 20+ m underground.
+        two_d_mode: true
         publish_tf: true
         publish_acceleration: false
         map_frame: map
@@ -56,7 +60,11 @@ ekf_filter_node_map:
         use_sim_time: true
         frequency: 50.0
         sensor_timeout: 0.1
-        two_d_mode: false
+        # Town10HD (and most urban CARLA maps) is effectively flat.  Locking
+        # z / roll / pitch to zero prevents the global EKF from drifting
+        # vertically once IMU / LIO noise accumulates — the car stays on
+        # the ground plane instead of sliding 20+ m underground.
+        two_d_mode: true
         transform_time_offset: 0.0
         transform_timeout: 0.0
         publish_tf: true
