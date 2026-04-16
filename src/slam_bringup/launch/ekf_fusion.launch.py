@@ -1,17 +1,16 @@
 """Dual-EKF + NavSat launch for map-frame GPS anchoring.
 
-Topology:
-    ekf_filter_node_odom (local)   →  odom  → base_link
-    ekf_filter_node_map  (global)  →  map   → odom
-    navsat_transform_node          →  /gps/fix + /odometry/filtered → /odometry/gps
+Mirrors robot_localization's `dual_ekf_navsat_example.launch.py`:
 
-The local EKF fuses LIO (+ optional VIO) and owns odom → base_link.
-The global EKF additionally fuses GPS and owns map → odom, correcting the
-odom frame's accumulated drift against the GPS datum.
+    ekf_filter_node_odom (local)   →  odom  → base_link  (→ /odometry/local)
+    ekf_filter_node_map  (global)  →  map   → odom       (→ /odometry/global)
+    navsat_transform_node          →  /gps/fix + /odometry/global → /odometry/gps
 
-FAST-LIO2's /Odometry has frame_id=camera_init.  A static identity TF
-odom → camera_init lets robot_localization resolve the measurement's
-frame to each EKF's world frame.
+FAST-LIO2 publishes /Odometry in `camera_init`.  A static identity TF
+`odom → camera_init` lets the EKFs resolve that frame to their world
+frames.  The global EKF consumes LIO in *differential* mode (LIO origin
+is the spawn point, not the GPS datum — feeding its absolute pose would
+fight GPS) plus GPS in absolute mode to own the true global pose.
 """
 
 import os
@@ -35,10 +34,9 @@ def generate_launch_description():
             'use_sim_time', default_value='true',
             description='Use simulation clock'),
 
-        # Static TF: odom → camera_init (identity)
-        # FAST-LIO2 publishes /Odometry in camera_init.  This edge lets the
-        # two EKFs transform the measurement into their world frames
-        # (odom for the local EKF, map for the global one via map→odom).
+        # Static TF: odom → camera_init (identity).
+        # Lets robot_localization resolve FAST-LIO's camera_init-framed
+        # /Odometry into either EKF's world frame.
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
@@ -48,28 +46,31 @@ def generate_launch_description():
         ),
 
         # ── Local EKF (odom frame) ─────────────────────────────────
-        # Fuses LIO + VIO, publishes odom → base_link.
+        # Fuses LIO (+ VIO), publishes odom → base_link and /odometry/local.
         Node(
             package='robot_localization',
             executable='ekf_node',
             name='ekf_filter_node_odom',
             output='screen',
             parameters=[ekf_config, {'use_sim_time': use_sim_time}],
-            remappings=[('odometry/filtered', '/odometry/filtered')],
+            remappings=[('odometry/filtered', '/odometry/local')],
         ),
 
         # ── Global EKF (map frame, with GPS) ───────────────────────
-        # Fuses LIO + GPS, publishes map → odom.
+        # Fuses LIO differentially + absolute /odometry/gps, publishes
+        # map → odom (the drift-correction transform) and /odometry/global.
         Node(
             package='robot_localization',
             executable='ekf_node',
             name='ekf_filter_node_map',
             output='screen',
             parameters=[ekf_config, {'use_sim_time': use_sim_time}],
-            remappings=[('odometry/filtered', '/odometry/filtered_map')],
+            remappings=[('odometry/filtered', '/odometry/global')],
         ),
 
-        # ── NavSat transform: /gps/fix + local pose → /odometry/gps ─
+        # ── NavSat transform: /gps/fix + global pose → /odometry/gps
+        # navsat subscribes to the GLOBAL EKF's output (example-conformant)
+        # so its heading / offset reasoning stays in the map frame.
         Node(
             package='robot_localization',
             executable='navsat_transform_node',
@@ -77,10 +78,11 @@ def generate_launch_description():
             output='screen',
             parameters=[ekf_config, {'use_sim_time': use_sim_time}],
             remappings=[
-                ('imu', '/imu/data'),
+                ('imu/data', '/imu/data'),
                 ('gps/fix', '/gps/fix'),
-                ('odometry/filtered', '/odometry/filtered'),
+                ('gps/filtered', '/gps/filtered'),
                 ('odometry/gps', '/odometry/gps'),
+                ('odometry/filtered', '/odometry/global'),
             ],
         ),
     ])
