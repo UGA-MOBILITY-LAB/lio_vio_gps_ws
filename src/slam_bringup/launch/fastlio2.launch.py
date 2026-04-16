@@ -37,14 +37,9 @@ def generate_launch_description():
             ],
         ),
 
-        # Static TF: body → base_link (identity)
-        # FAST-LIO2 publishes camera_init → body.
-        # Downstream expects base_link as the robot frame.
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='body_to_base_link',
-            arguments=['0', '0', '0', '0', '0', '0', 'body', 'base_link'],
-            parameters=[{'use_sim_time': use_sim_time}],
-        ),
+        # NOTE: base_link's parent is now owned by the local EKF in
+        # ekf_fusion.launch.py (ekf_filter_node_odom publishes
+        # odom → base_link). FAST-LIO's body frame lives in an isolated
+        # subtree (odom → camera_init → body via ekf_fusion's static and
+        # FAST-LIO's own TF) — they don't need to share base_link.
     ])

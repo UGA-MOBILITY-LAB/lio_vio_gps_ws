@@ -313,16 +313,16 @@ class CarlaLVISamBridge(Node):
         self._vehicle = self._world.spawn_actor(vehicle_bp, spawns[0])
         self._vehicle.set_autopilot(True, self._tm.get_port())
 
-        # Keep the car moving for a continuous SLAM demo:
-        #   - ignore red lights / stop signs
-        #   - drive slightly above the speed limit (auto = +30%)
+        # Keep the car moving continuously for SLAM demos (no red-light
+        # waits). Stick to the speed limit so inter-scan motion stays
+        # manageable for 10 Hz FAST-LIO (high speed = ICP struggles).
         self._tm.ignore_lights_percentage(self._vehicle, 100.0)
         self._tm.ignore_signs_percentage(self._vehicle, 100.0)
-        self._tm.vehicle_percentage_speed_difference(self._vehicle, -30.0)
+        self._tm.vehicle_percentage_speed_difference(self._vehicle, 0.0)
 
         self.get_logger().info(
             f'Spawned {bp_filter} at {spawns[0].location}  '
-            f'(autopilot ON, ignoring lights/signs, +30% speed)')
+            f'(autopilot ON, ignoring lights/signs, speed-limit)')
 
         self._spectator = self._world.get_spectator()
         self._update_spectator()
