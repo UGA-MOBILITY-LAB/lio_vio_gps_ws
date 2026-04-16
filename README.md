@@ -316,7 +316,10 @@ ros2 launch slam_bringup carla_full.launch.py
 # optional flags:
 #   rviz:=false   # headless, no RViz window
 #   vins:=true    # enable VINS-Fusion (currently WIP, off by default)
+#   two_d:=false  # 3D mode (default true locks z/roll/pitch for flat CARLA maps)
 ```
+
+> **Startup expectation** — give the pipeline **5–10 seconds** to stabilise after launch. The global EKF's pose will swing noticeably while (a) FAST-LIO2 finishes IMU gravity alignment and builds its first local map, and (b) `navsat_transform_node`'s 5-second delay expires and GPS fusion kicks in. After that, the RViz pose stays locked to the map and the accumulated cloud stops sliding.
 
 This single command launches:
 1. **carla_live_publisher** — connects to CARLA, spawns vehicle + sensors, publishes all topics + `/clock`; spectator camera chases the ego vehicle so the CARLA window always shows it
@@ -629,6 +632,46 @@ The bridge handles `SIGINT` (Ctrl+C) and `SIGTERM` gracefully:
 2. Destroys the ego vehicle actor
 3. Restores CARLA world to asynchronous mode
 4. Disables traffic manager synchronous mode
+
+---
+
+## Real-World Deployment Notes
+
+### GPS quality — what to do when GPS is noisy or drops out
+
+The CARLA demo uses a noise-free simulated GNSS, but real vehicles rarely see that. How the pipeline copes:
+
+| Scenario | Behaviour |
+|----------|-----------|
+| **RTK-GPS (1–2 cm)** | Best case — EKF tight-couples GPS and LIO. `odometry/global` is GPS-accurate, LIO handles short outages |
+| **Consumer GPS (3–5 m)** | Still usable — `navsat_transform_node` forwards GPS covariance into `/odometry/gps`, so EKF automatically weights it less than LIO at short timescales but trusts it for long-term drift correction |
+| **Urban canyon / multipath** | Covariance spikes → EKF naturally trusts LIO more. Consider a lightweight pre-filter that drops `/gps/fix` messages with `status == NO_FIX` or bad HDOP before they reach `navsat_transform` |
+| **GPS-denied (tunnel, indoor, underground)** | EKF falls back to LIO + IMU dead reckoning. For long-duration GPS loss you'll want **loop closure** (FAST-LIO-SAM or scan-context + pose-graph backend) since pure FAST-LIO2 drifts over time |
+
+**Tuning knobs:**
+- `odom1_config` / `odom0_config` in `ekf_navsat.yaml` — control which GPS fields are fused (disable `z` if altitude is unreliable — already done in the default)
+- `process_noise_covariance` in the EKF — smaller values make the EKF more confident in its motion model (LIO), less reactive to GPS jumps
+- `navsat_transform_node.delay` — already 5 s; increase further if your GPS module takes longer to converge
+
+### Flat vs 3D terrain
+
+`two_d_mode: true` (default in CARLA launch via `two_d:=true`) locks z / roll / pitch to zero. Right call for Town10HD and most urban maps. On real vehicles with actual elevation changes, launch with `two_d:=false`:
+
+```bash
+ros2 launch slam_bringup carla_full.launch.py two_d:=false
+```
+
+When running 3D make sure LIO's z output is trustworthy (CARLA sim-GPS altitude is *not*). A real RTK with good DOP is the simplest fix; otherwise add a barometer / wheel-speed-derived pitch to the EKF.
+
+### Startup stability
+
+The first **5–10 seconds** after launch are noisy — this is fundamental to every EKF + SLAM stack:
+
+1. FAST-LIO2 needs a few seconds for IMU bias estimation + initial scan registration.
+2. `navsat_transform_node` waits for its `delay: 5.0` before publishing `/odometry/gps`, so that GPS enters the filter only after LIO has converged.
+3. The EKF's initial covariance is large → early measurements move the state noticeably.
+
+Don't trust the fused pose for the first ~10 s. The `delay` parameter in `ekf_navsat.yaml` can be tuned further. For production you probably want a separate "SLAM ready" flag before handing the pose to a planner.
 
 ---
 

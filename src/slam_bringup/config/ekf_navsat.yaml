@@ -122,7 +122,10 @@ navsat_transform_node:
     ros__parameters:
         use_sim_time: true
         frequency: 30.0
-        delay: 3.0
+        # 5 s cushion lets LIO reach its first /Odometry and IMU gravity
+        # alignment complete before GPS is introduced — reduces the wild
+        # pose excursions users see in the first few seconds.
+        delay: 5.0
         magnetic_declination_radians: 0.0
         yaw_offset: 0.0
         zero_altitude: false

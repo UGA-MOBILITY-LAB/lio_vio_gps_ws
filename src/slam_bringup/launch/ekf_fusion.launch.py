@@ -18,7 +18,8 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition, UnlessCondition
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
 
@@ -28,11 +29,19 @@ def generate_launch_description():
         slam_bringup_share, 'config', 'ekf_navsat.yaml')
 
     use_sim_time = LaunchConfiguration('use_sim_time')
+    two_d = LaunchConfiguration('two_d')
+    two_d_bool = PythonExpression(
+        ["'", two_d, "'.lower() not in ('false', '0', 'no')"])
 
     return LaunchDescription([
         DeclareLaunchArgument(
             'use_sim_time', default_value='true',
             description='Use simulation clock'),
+        DeclareLaunchArgument(
+            'two_d', default_value='true',
+            description='Lock z / roll / pitch to zero. Default true for flat '
+                        'CARLA maps; set false on real vehicles with real '
+                        'altitude variation.'),
 
         # Static TF: odom → camera_init (identity).
         # Lets robot_localization resolve FAST-LIO's camera_init-framed
@@ -52,7 +61,10 @@ def generate_launch_description():
             executable='ekf_node',
             name='ekf_filter_node_odom',
             output='screen',
-            parameters=[ekf_config, {'use_sim_time': use_sim_time}],
+            parameters=[
+                ekf_config,
+                {'use_sim_time': use_sim_time, 'two_d_mode': two_d_bool},
+            ],
             remappings=[('odometry/filtered', '/odometry/local')],
         ),
 
@@ -64,7 +76,10 @@ def generate_launch_description():
             executable='ekf_node',
             name='ekf_filter_node_map',
             output='screen',
-            parameters=[ekf_config, {'use_sim_time': use_sim_time}],
+            parameters=[
+                ekf_config,
+                {'use_sim_time': use_sim_time, 'two_d_mode': two_d_bool},
+            ],
             remappings=[('odometry/filtered', '/odometry/global')],
         ),
 
