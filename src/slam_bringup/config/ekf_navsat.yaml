@@ -38,6 +38,19 @@ ekf_filter_node_odom:
         odom1_queue_size: 10
         odom1_differential: true
 
+        # IMU — gravity-aligned orientation + angular dynamics.
+        imu0: /imu/data
+        imu0_config: [false, false, false,
+                      true,  true,  false,
+                      false, false, false,
+                      true,  true,  true,
+                      true,  true,  true]
+        imu0_queue_size: 50
+        imu0_nodelay: true
+        imu0_differential: false
+        imu0_relative: false
+        imu0_remove_gravitational_acceleration: true
+
 ekf_filter_node_map:
     ros__parameters:
         use_sim_time: true
@@ -53,14 +66,12 @@ ekf_filter_node_map:
         base_link_frame: base_link
         world_frame: map                  # global — publishes map → odom
 
-        # FAST-LIO's /Odometry origin is the start of the run (camera_init),
-        # not the UTM datum — feeding it as absolute would fight GPS. Use
-        # differential so EKF consumes only the pose *deltas* between
-        # consecutive LIO messages (effectively velocity) and lets GPS own
-        # the absolute map-frame position.
+        # FAST-LIO's /Odometry is differential here — position deltas only.
+        # Orientation is owned by the IMU (imu0), not LIO, to keep roll/pitch
+        # gravity-aligned and prevent the map from tilting.
         odom0: /Odometry                  # FAST-LIO2
         odom0_config: [true,  true,  true,
-                       true,  true,  true,
+                       false, false, false,
                        false, false, false,
                        false, false, false,
                        false, false, false]
@@ -70,8 +81,8 @@ ekf_filter_node_map:
         odom0_relative: false
 
         # GPS projected into the map frame by navsat_transform_node.
-        # Position-only (GPS has no orientation), absolute (GPS is the
-        # global anchor that counters LIO long-term drift).
+        # x, y position only — GPS altitude is noisy and we rely on LIO
+        # z-delta for vertical motion.
         odom1: /odometry/gps
         odom1_config: [true,  true,  false,
                        false, false, false,
@@ -82,6 +93,22 @@ ekf_filter_node_map:
         odom1_nodelay: true
         odom1_differential: false
         odom1_relative: false
+
+        # IMU supplies the gravity-aligned orientation (roll, pitch) and
+        # all angular / linear-acc dynamics. Without this the map→odom
+        # transform tilts over time because neither LIO-differential nor
+        # GPS constrains the global orientation.
+        imu0: /imu/data
+        imu0_config: [false, false, false,
+                      true,  true,  false,
+                      false, false, false,
+                      true,  true,  true,
+                      true,  true,  true]
+        imu0_queue_size: 50
+        imu0_nodelay: true
+        imu0_differential: false
+        imu0_relative: false
+        imu0_remove_gravitational_acceleration: true
 
 navsat_transform_node:
     ros__parameters:
