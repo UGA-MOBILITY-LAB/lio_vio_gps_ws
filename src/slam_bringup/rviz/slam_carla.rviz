@@ -289,7 +289,7 @@ Visualization Manager:
         Value: false
       Enabled: true
       Keep: 100
-      Name: EKF Fused (red)
+      Name: EKF Fused (red) — map frame, GPS-anchored
       Position Tolerance: 0.10000000149011612
       Shape:
         Alpha: 1
@@ -307,7 +307,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /odometry/filtered
+        Value: /odometry/global
       Value: true
     - Class: rviz_default_plugins/Image
       Enabled: true
@@ -326,7 +326,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 30; 30; 30
-    Fixed Frame: camera_init
+    Fixed Frame: map
     Frame Rate: 30
   Name: root
   Tools:
