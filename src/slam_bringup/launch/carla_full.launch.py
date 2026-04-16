@@ -34,6 +34,7 @@ def generate_launch_description():
     rviz = LaunchConfiguration('rviz')
     vins = LaunchConfiguration('vins')
     two_d = LaunchConfiguration('two_d')
+    plot = LaunchConfiguration('plot')
 
     return LaunchDescription([
         # ── Launch arguments ──────────────────────────────────────
@@ -55,6 +56,13 @@ def generate_launch_description():
             default_value='true',
             description='Lock EKF z/roll/pitch to zero. Default true for flat '
                         'CARLA maps; set false for 3D scenarios or real vehicles.',
+        ),
+        DeclareLaunchArgument(
+            'plot',
+            default_value='false',
+            description='Launch PlotJuggler alongside for real-time numeric '
+                        'time-series of all pose sources. Load the bundled '
+                        'layout via File > Load Layout (demos/plotjuggler_odom.xml).',
         ),
 
         # ── 1. CARLA bridge (clock server — NOT use_sim_time) ─────
@@ -111,5 +119,15 @@ def generate_launch_description():
             arguments=['-d', rviz_config],
             parameters=[{'use_sim_time': True}],
             condition=IfCondition(rviz),
+        ),
+
+        # ── 6. PlotJuggler (real-time numeric time-series) ───────
+        Node(
+            package='plotjuggler',
+            executable='plotjuggler',
+            name='plotjuggler',
+            output='screen',
+            parameters=[{'use_sim_time': True}],
+            condition=IfCondition(plot),
         ),
     ])
