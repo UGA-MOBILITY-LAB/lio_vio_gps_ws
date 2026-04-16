@@ -20,21 +20,36 @@ use_gpu:           0
 use_gpu_acc_flow:  0
 use_gpu_ceres:     0
 
-# Extrinsic parameter between IMU and Camera.
-# 0 = trust the matrix below exactly, 1 = optimize around initial guess.
-# The bridge mounts camera at (+0.5, 0, +1.5) m in base_link with identity
-# rotation.  IMU is at (0, 0, 0) in base_link.  So camera w.r.t. IMU (body)
-# is a pure translation (+0.5, 0, +1.5) with identity rotation.
-estimate_extrinsic: 0
+# Extrinsic parameter between IMU (body) and Camera.
+#
+# Two coordinate-system conventions collide here:
+#   - IMU / body frame (ROS REP-103): x = forward, y = left,  z = up
+#   - Camera optical frame (OpenCV): x = right,   y = down,   z = forward
+#
+# body_T_cam0 takes a point in camera optical coords and expresses it in
+# body (IMU) coords.  The rotation that maps:
+#    +X_cam (right)   → −Y_body (−left = right)
+#    +Y_cam (down)    → −Z_body (−up   = down)
+#    +Z_cam (forward) → +X_body (forward)
+#
+# is  R_body_cam = [[0, 0, 1], [−1, 0, 0], [0, −1, 0]].
+#
+# Translation: the bridge mounts camera at (+0.5, 0, +1.5) m in base_link
+# and IMU at the origin, so the camera optical centre sits at that offset
+# in the body frame.
+#
+# estimate_extrinsic: 1 lets VINS refine this online; set 0 only if you
+# really trust the matrix.
+estimate_extrinsic: 1
 
 body_T_cam0: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
-   data: [1.0, 0.0, 0.0, 0.5,
-          0.0, 1.0, 0.0, 0.0,
-          0.0, 0.0, 1.0, 1.5,
-          0.0, 0.0, 0.0, 1.0]
+   data: [ 0.0,  0.0, 1.0, 0.5,
+          -1.0,  0.0, 0.0, 0.0,
+           0.0, -1.0, 0.0, 1.5,
+           0.0,  0.0, 0.0, 1.0]
 
 # Multiple thread support
 multiple_thread: 1
