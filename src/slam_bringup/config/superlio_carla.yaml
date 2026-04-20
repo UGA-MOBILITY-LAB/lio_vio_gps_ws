@@ -1,0 +1,60 @@
+/**:
+    ros__parameters:
+        use_sim_time: true
+
+        # ── Map IO ────────────────────────────────────────────────
+        lio.map.save_map: false
+        lio.map.if_filter: false
+        lio.map.save_map_dir: "map"
+        lio.map.map_name: "map.pcd"
+        lio.map.ds_size: 0.5
+        lio.map.save_interval: 500
+
+        # ── Sensor topics (match carla_live_publisher output) ────
+        lio.ros.lidar_topic: "/lidar/points"
+        lio.ros.imu_topic:   "/imu/data"
+
+        # lidar_type: 1=mid360, 2=hesai16, 3=velo16, 4=velo32, 5=vel_nclt, 6=ls16
+        # Bridge emits std PointCloud2 with ring(uint16)+time(float32) at ~10 Hz;
+        # NCLT handler consumes exactly this layout.
+        lio.sensor.lidar_type: 5
+        lio.sensor.blind: 2.0
+        lio.sensor.maxrange: 100.0
+        lio.sensor.filter_rate: 3
+        lio.sensor.enable_downsample: true
+        lio.sensor.voxel_fliter_size: 0.5
+        lio.sensor.gravity_norm: 9.81
+        lio.sensor.imu_type: 0
+        lio.sensor.imu_na:  0.1
+        lio.sensor.imu_ng:  0.1
+        lio.sensor.imu_nba: 0.0001
+        lio.sensor.imu_nbg: 0.0001
+
+        # CARLA LiDAR sits 1.8 m above the IMU/base_link — matches
+        # extrinsic_T in fastlio2_carla.yaml.  Format: [tx,ty,tz, R row-major].
+        lio.extrinsic.lidar_imu: [0.0, 0.0, 1.8,
+                                  1.0, 0.0, 0.0,
+                                  0.0, 1.0, 0.0,
+                                  0.0, 0.0, 1.0]
+        lio.extrinsic.odom_robo: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+        # ── OctVoxMap (Super-LIO's compact mapping strategy) ─────
+        lio.hash_map.hash_capacity: 100000000
+        lio.hash_map.vox_resolution: 0.5
+
+        # ── ESKF ──────────────────────────────────────────────────
+        lio.kf.kf_type: 0
+        lio.kf.kf_max_iterations: 4
+        lio.kf.kf_align_gravity: true
+        lio.kf.kf_quit_eps: 0.001
+
+        # ── Output toggles (planner off; mapping + dense cloud on) ─
+        lio.output.robot: false
+        lio.output.plan_env_world: false
+        lio.output.plan_env_body: false
+        lio.output.planner: false
+        lio.output.map: true
+        lio.output.dense: true
+        lio.output.pub_step: 10
+
+        lio.eva.timer: true

@@ -1,12 +1,17 @@
-"""Full CARLA simulation pipeline: bridge + FAST-LIO2 + VINS-Fusion + EKF + RViz.
+"""Full CARLA simulation pipeline: bridge + Super-LIO + FAST-LIO2 + VINS-Fusion + EKF + RViz.
 
 Launches:
   1. carla_live_publisher — CARLA sensor bridge + /clock server
-  2. FAST-LIO2 — LiDAR-Inertial odometry
-  3. VINS-Fusion — Visual-Inertial odometry (mono)
-  4. robot_localization EKF + navsat_transform — multi-source fusion
-  5. Static TF: body → base_link
+  2. Super-LIO — LiDAR-Inertial odometry with octree voxel map (feeds EKF)
+  3. FAST-LIO2 — LiDAR-Inertial odometry, kept on for side-by-side comparison
+  4. VINS-Fusion — Visual-Inertial odometry (mono), off by default
+  5. robot_localization EKF + navsat_transform — multi-source fusion
   6. RViz2 with unified slam_carla.rviz layout (toggle with rviz:=false)
+
+The global/local EKFs consume Super-LIO (/lio/odom), not FAST-LIO,
+because Super-LIO's OctVoxMap is substantially more stable on z.
+FAST-LIO2 still publishes /Odometry for visual comparison; toggle it
+off with fastlio2:=false.
 
 All SLAM nodes use use_sim_time:=true.  The CARLA bridge does NOT
 (it is the clock source).
@@ -33,6 +38,7 @@ def generate_launch_description():
     town = LaunchConfiguration('town')
     rviz = LaunchConfiguration('rviz')
     vins = LaunchConfiguration('vins')
+    fastlio2 = LaunchConfiguration('fastlio2')
     two_d = LaunchConfiguration('two_d')
     plot = LaunchConfiguration('plot')
 
@@ -50,6 +56,12 @@ def generate_launch_description():
             'vins',
             default_value='false',
             description='Launch VINS-Fusion (requires a VINS-format config; off until vins_carla_mono.yaml is converted)',
+        ),
+        DeclareLaunchArgument(
+            'fastlio2',
+            default_value='true',
+            description='Also launch FAST-LIO2 alongside Super-LIO for visual '
+                        'comparison. EKF ignores it; set false to save CPU.',
         ),
         DeclareLaunchArgument(
             'two_d',
@@ -79,7 +91,17 @@ def generate_launch_description():
             }],
         ),
 
-        # ── 2. FAST-LIO2 ─────────────────────────────────────────
+        # ── 2. Super-LIO (primary LIO, feeds the EKF) ────────────
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(launch_dir, 'superlio.launch.py')),
+            launch_arguments={
+                'use_sim_time': 'true',
+                'config_file': 'superlio_carla.yaml',
+            }.items(),
+        ),
+
+        # ── 3. FAST-LIO2 (comparison only; EKF does not consume it) ─
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(launch_dir, 'fastlio2.launch.py')),
@@ -87,9 +109,10 @@ def generate_launch_description():
                 'use_sim_time': 'true',
                 'config_file': 'fastlio2_carla.yaml',
             }.items(),
+            condition=IfCondition(fastlio2),
         ),
 
-        # ── 3. VINS-Fusion (off by default) ──────────────────────
+        # ── 4. VINS-Fusion (off by default) ──────────────────────
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(launch_dir, 'vins_fusion.launch.py')),
@@ -100,7 +123,7 @@ def generate_launch_description():
             condition=IfCondition(vins),
         ),
 
-        # ── 4. EKF fusion + NavSat ───────────────────────────────
+        # ── 5. EKF fusion + NavSat ───────────────────────────────
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(launch_dir, 'ekf_fusion.launch.py')),
@@ -110,7 +133,7 @@ def generate_launch_description():
             }.items(),
         ),
 
-        # ── 5. RViz2 (unified mapping + localization view) ───────
+        # ── 6. RViz2 (unified mapping + localization view) ───────
         Node(
             package='rviz2',
             executable='rviz2',
@@ -121,7 +144,7 @@ def generate_launch_description():
             condition=IfCondition(rviz),
         ),
 
-        # ── 6. PlotJuggler (real-time numeric time-series) ───────
+        # ── 7. PlotJuggler (real-time numeric time-series) ───────
         Node(
             package='plotjuggler',
             executable='plotjuggler',
