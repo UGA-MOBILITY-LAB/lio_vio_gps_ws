@@ -6,11 +6,13 @@ Mirrors robot_localization's `dual_ekf_navsat_example.launch.py`:
     ekf_filter_node_map  (global)  →  map   → odom       (→ /odometry/global)
     navsat_transform_node          →  /gps/fix + /odometry/global → /odometry/gps
 
-FAST-LIO2 publishes /Odometry in `camera_init`.  A static identity TF
-`odom → camera_init` lets the EKFs resolve that frame to their world
-frames.  The global EKF consumes LIO in *differential* mode (LIO origin
-is the spawn point, not the GPS datum — feeding its absolute pose would
-fight GPS) plus GPS in absolute mode to own the true global pose.
+Super-LIO publishes /lio/odom in its own `world` frame.  FAST-LIO2 (kept
+alive for comparison) publishes /Odometry in `camera_init`.  Two static
+identity TFs — `odom → world` and `odom → camera_init` — let the EKFs
+resolve either frame to their world frames.  The global EKF consumes
+Super-LIO in *differential* mode (LIO origin is the spawn point, not
+the GPS datum — feeding its absolute pose would fight GPS) plus GPS in
+absolute mode to own the true global pose.
 """
 
 import os
@@ -51,6 +53,20 @@ def generate_launch_description():
             executable='static_transform_publisher',
             name='odom_to_camera_init',
             arguments=['0', '0', '0', '0', '0', '0', 'odom', 'camera_init'],
+            parameters=[{'use_sim_time': use_sim_time}],
+        ),
+
+        # Static TF: odom → world (identity).
+        # Super-LIO publishes /lio/odom with frame_id="world" and a
+        # TF world → imu of its own.  Gluing world under odom lets the
+        # EKFs consume /lio/odom without frame-mismatch warnings, and
+        # keeps Super-LIO's /lio/cloud_world visualisable under the
+        # global map frame.
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='odom_to_world',
+            arguments=['0', '0', '0', '0', '0', '0', 'odom', 'world'],
             parameters=[{'use_sim_time': use_sim_time}],
         ),
 
